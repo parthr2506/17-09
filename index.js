@@ -1,21 +1,24 @@
 const express = require("express")
 const cors = require("cors")
-const { getDb, connectToDb } = require("./db");
-const { ObjectId } = require('mongodb');
+// const { ObjectId } = require('mongodb');
+const prisma = require("./prisma/index")
 
 const app = express()
 app.use(express.json())
 app.use(cors())
 
-let db
-connectToDb((error) => {
-    if (!error) {
-        app.listen(5000, () => {
-            console.log("Listening on 5000....")
-        })
-        db = getDb()
-    }
-})
+// let db
+// connectToDb((error) => {
+//     if (!error) {
+//         app.listen(5000, () => {
+//             console.log("Listening on 5000....")
+//         })
+//         db = getDb()
+//     }
+// })
+app.listen(5000, () => {
+    console.log("Listening on 5000....");
+});
 
 app.get("/students", async (req, res) => {
     try {
@@ -24,26 +27,35 @@ app.get("/students", async (req, res) => {
         const pageSize = parseInt(req.query.pageSize) || 3;
         const skip = (page - 1) * pageSize;
 
-        let filter = {};
+        let where = {};
         if (field && query) {
-            if (field === "name") {
-                filter.name = { $regex: query, $options: "i" }
-            }
-            else if (field === "place") {
-                filter.place = { $regex: query, $options: "i" }
-            }
+            // if (field === "name") {
+            //     filter.name = { $regex: query, $options: "i" }
+            // }
+            // else if (field === "place") {
+            //     filter.place = { $regex: query, $options: "i" }
+            // }
+            where = {
+                [field]: { contains: query, mode: 'insensitive' }
+            };
         }
-        let sort = {};
+        let orderBy = {};
         if (sortField && sortOrder) {
-            sort[sortField] = sortOrder === 'ascend' ? 1 : -1;
+            orderBy = { [sortField]: sortOrder === 'ascend' ? 'asc' : 'desc' }
         }
-        const totalCount = await db.collection("Students").countDocuments(filter);
-        const students = await db.collection("Students")
-            .find(filter)
-            .sort(sort)
-            .skip(skip)
-            .limit(pageSize)
-            .toArray();
+
+        const [students, totalCount] = await prisma.$transaction([
+            prisma.students.findMany({
+                where,
+                orderBy,
+                skip,
+                take: pageSize,
+                include: {
+                    class: true
+                }
+            }),
+            prisma.students.count({ where })
+        ]);
 
         res.status(200).json({
             students,
@@ -56,24 +68,62 @@ app.get("/students", async (req, res) => {
         res.status(500).json({ message: "No Records found" });
     }
 });
+//         const totalCount = await db.collection("Students").countDocuments(filter);
+//         const students = await db.collection("Students")
+//             .find(filter)
+//             .sort(sort)
+//             .skip(skip)
+//             .limit(pageSize)
+//             .toArray();
 
-app.post("/students/post", (req, res) => {
-    const studentData = req.body;
+//         res.status(200).json({
+//             students,
+//             currentPage: page,
+//             totalPages: Math.ceil(totalCount / pageSize),
+//             totalCount
+//         });
+//     } catch (error) {
+//         console.error("Error fetching students:", error);
+//         res.status(500).json({ message: "No Records found" });
+//     }
+// });
 
-    const studentToInsert = {
-        name: studentData.name,
-        email: studentData.email,
-        place: studentData.place,
-        class_id: new ObjectId(studentData.class_id)
-    };
+app.post("/students/post", async (req, res) => {
+    try {
+        const studentData = req.body;
+        const result = await prisma.students.create({
+            data: {
+                name: studentData.name,
+                email: studentData.email,
+                place: studentData.place,
+                // class_id: new ObjectId(studentData.class_id),
+                class: {
+                    connect: { id: studentData.class_id }
+                }
 
-    db.collection("Students")
-        .insertOne(studentToInsert)
-        .then((result) => {
-            res.status(201).json(result)
-        })
-        .catch((error) => {
-            console.error("Error while inserting student details:", error);
-            res.status(500).json({ error: "Could not insert the student record" })
-        })
+            }
+        });
+        res.status(201).json(result)
+    } catch (error) {
+        console.error("Error while inserting student details:", error);
+        res.status(500).json({ error: "Could not insert the student record" });
+    }
+    // const studentData = req.body;
+
+    // const studentToInsert = {
+    //     name: studentData.name,
+    //     email: studentData.email,
+    //     place: studentData.place,
+    //     class_id: new ObjectId(studentData.class_id)
+    // };
+
+    // db.collection("Students")
+    //     .insertOne(studentToInsert)
+    //     .then((result) => {
+    //         res.status(201).json(result)
+    //     })
+    //     .catch((error) => {
+    //         console.error("Error while inserting student details:", error);
+    //         res.status(500).json({ error: "Could not insert the student record" })
+    //     })
 })

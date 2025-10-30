@@ -35,7 +35,7 @@ function App() {
       }
       const { students: fetchedStudents, totalCount } = await response.json();
       setStudents(fetchedStudents);
-      setPagination(prev => ({ ...prev, total: totalCount, current: currentPage }));
+      setPagination(prev => ({ ...prev, total: totalCount }));
     } catch (error) {
       console.error("cannot find data", error);
       message.error("Failed to fetch students.");
@@ -44,14 +44,31 @@ function App() {
     }
   };
 
+  // useEffect(() => {
+  //   const currentPage = debouncedQuery ? 1 : pagination.current;
+
+  //   if (debouncedQuery && pagination.current !== 1) {
+  //     setPagination(prev => ({ ...prev, current: 1 }));
+  //   } else {
+  //     fetchStudents(currentPage, pagination.pageSize, sortInfo, searchField, debouncedQuery);
+  //   }
+  // }, [searchField, debouncedQuery, pagination.current, pagination.pageSize, sortInfo.field, sortInfo.order]);
+
   useEffect(() => {
-    fetchStudents(pagination.current, pagination.pageSize, sortInfo, searchField, debouncedQuery, sortInfo.field, sortInfo.order);
-  }, [searchField, debouncedQuery, pagination.current, pagination.pageSize, sortInfo.field, sortInfo.order]);
+
+    setPagination(prev => ({ ...prev, current: 1 }));
+  }, [searchField, debouncedQuery]);
+
+  useEffect(() => {
+    fetchStudents(pagination.current, pagination.pageSize, sortInfo, searchField, debouncedQuery);
+  }, [pagination.current, pagination.pageSize, sortInfo.field, sortInfo.order, searchField, debouncedQuery]);
+
 
   const handleClearSearch = () => {
     setSearchInput("");
     setSearchField('name');
     setSortInfo({ field: undefined, order: undefined });
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleTableChange = (newPagination, _, sorter) => {
@@ -113,7 +130,10 @@ function App() {
           { title: 'Name', dataIndex: 'name', key: 'name', sorter: true },
           { title: 'Place', dataIndex: 'place', key: 'place', sorter: true },
           { title: 'Email', dataIndex: 'email', key: 'email', sorter: true },
-          { title: 'Class ID', dataIndex: 'class_id', key: 'class_id' },
+          // { title: 'Class ID', dataIndex: 'class_id', key: 'class_id' },
+
+          { title: 'Standard', dataIndex: ['class', 'standard'], key: 'standard' },
+          { title: 'Division', dataIndex: ['class', 'division'], key: 'division' },
           // {
           //   title: 'Action',
           //   key: 'action',
@@ -135,7 +155,7 @@ function App() {
         }}
         onChange={handleTableChange}
         loading={loading}
-        rowKey="_id"
+        rowKey="id"
       />
 
       <h1>Add a New Student Details</h1>
